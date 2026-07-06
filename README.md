@@ -1,9 +1,9 @@
 # web-config-guard
 
-[![Go Reference](https://pkg.go.dev/badge/github.com/minkin/web-config-guard.svg)](https://pkg.go.dev/github.com/minkin/web-config-guard)
+[![Go Reference](https://pkg.go.dev/badge/github.com/minkinad/web-config-guard.svg)](https://pkg.go.dev/github.com/minkin/web-config-guard)
 [![Go Report Card](https://goreportcard.com/badge/github.com/minkin/web-config-guard)](https://goreportcard.com/report/github.com/minkin/web-config-guard)
-[![CI](https://github.com/minkin/web-config-guard/actions/workflows/ci.yml/badge.svg)](https://github.com/minkin/web-config-guard/actions/workflows/ci.yml)
-[![CodeQL](https://github.com/minkin/web-config-guard/actions/workflows/codeql.yml/badge.svg)](https://github.com/minkin/web-config-guard/actions/workflows/codeql.yml)
+[![CI](https://github.com/minkinad/web-config-guard/actions/workflows/ci.yml/badge.svg)](https://github.com/minkin/web-config-guard/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/minkinad/web-config-guard/actions/workflows/codeql.yml/badge.svg)](https://github.com/minkin/web-config-guard/actions/workflows/codeql.yml)
 ![Go Version](https://img.shields.io/badge/Go-1.22-00ADD8?logo=go&logoColor=white)
 ![Config Formats](https://img.shields.io/badge/config-YAML%20%7C%20JSON-blue)
 

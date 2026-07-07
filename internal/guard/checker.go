@@ -33,7 +33,7 @@ func CheckFilePermissions(path string, info fs.FileInfo, hasSecrets bool) []Prob
 		if err != nil {
 			return []Problem{{
 				Severity:       SeverityHigh,
-				Rule:           "file-permissions",
+				Rule:           RuleFilePermissions,
 				File:           path,
 				Message:        "не удалось проверить права доступа к файлу",
 				Recommendation: "Проверьте существование файла и права пользователя, запускающего утилиту",
@@ -46,7 +46,7 @@ func CheckFilePermissions(path string, info fs.FileInfo, hasSecrets bool) []Prob
 	if mode&0o002 != 0 {
 		problems = append(problems, Problem{
 			Severity:       SeverityHigh,
-			Rule:           "file-permissions",
+			Rule:           RuleFilePermissions,
 			File:           path,
 			Message:        "конфигурационный файл доступен на запись всем пользователям",
 			Recommendation: "Ограничьте права доступа, например chmod 600 или chmod 640",
@@ -55,7 +55,7 @@ func CheckFilePermissions(path string, info fs.FileInfo, hasSecrets bool) []Prob
 	if mode&0o020 != 0 {
 		problems = append(problems, Problem{
 			Severity:       SeverityMedium,
-			Rule:           "file-permissions",
+			Rule:           RuleFilePermissions,
 			File:           path,
 			Message:        "конфигурационный файл доступен на запись группе",
 			Recommendation: "Разрешайте запись только владельцу файла, если это не требуется явно",
@@ -64,7 +64,7 @@ func CheckFilePermissions(path string, info fs.FileInfo, hasSecrets bool) []Prob
 	if hasSecrets && mode&0o044 != 0 {
 		problems = append(problems, Problem{
 			Severity:       SeverityMedium,
-			Rule:           "file-permissions",
+			Rule:           RuleFilePermissions,
 			File:           path,
 			Message:        "файл с секретами доступен для чтения группе или всем пользователям",
 			Recommendation: "Для конфигов с секретами используйте более строгие права, например chmod 600",
@@ -77,7 +77,7 @@ func CheckFilePermissions(path string, info fs.FileInfo, hasSecrets bool) []Prob
 
 func HasSecretProblems(problems []Problem) bool {
 	for _, problem := range problems {
-		if problem.Rule == "plaintext-password" {
+		if problem.Rule == RulePlaintextPassword {
 			return true
 		}
 	}

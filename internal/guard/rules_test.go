@@ -20,11 +20,11 @@ func TestDefaultRulesFindSecurityProblems(t *testing.T) {
 	}
 
 	problems := NewChecker(nil).Check(config)
-	assertProblem(t, problems, "debug-logging")
-	assertProblem(t, problems, "plaintext-password")
-	assertProblem(t, problems, "wildcard-bind")
-	assertProblem(t, problems, "tls-disabled")
-	assertProblem(t, problems, "weak-algorithm")
+	assertProblem(t, problems, RuleDebugLogging)
+	assertProblem(t, problems, RulePlaintextPassword)
+	assertProblem(t, problems, RuleWildcardBind)
+	assertProblem(t, problems, RuleTLSDisabled)
+	assertProblem(t, problems, RuleWeakAlgorithm)
 }
 
 func TestSecretReferencesAreNotPlaintextPasswords(t *testing.T) {
@@ -64,7 +64,18 @@ func TestWildcardBindFindsAddressWithPort(t *testing.T) {
 	}
 
 	problems := WildcardBindRule{}.Check(config)
-	assertProblem(t, problems, "wildcard-bind")
+	assertProblem(t, problems, RuleWildcardBind)
+}
+
+func TestWildcardBindFindsIPv6AnyAddress(t *testing.T) {
+	config := map[string]any{
+		"server": map[string]any{
+			"listen": "[::]:8080",
+		},
+	}
+
+	problems := WildcardBindRule{}.Check(config)
+	assertProblem(t, problems, RuleWildcardBind)
 }
 
 func TestTLSDisabledFindsStringValues(t *testing.T) {
@@ -90,7 +101,7 @@ func TestCheckFilePermissions(t *testing.T) {
 	}
 
 	problems := CheckFilePermissions(file, nil, true)
-	assertProblem(t, problems, "file-permissions")
+	assertProblem(t, problems, RuleFilePermissions)
 }
 
 func assertProblem(t *testing.T, problems []Problem, rule string) {

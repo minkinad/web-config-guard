@@ -11,6 +11,15 @@ type Rule interface {
 	Check(value any) []Problem
 }
 
+const (
+	RuleDebugLogging      = "debug-logging"
+	RulePlaintextPassword = "plaintext-password"
+	RuleWildcardBind      = "wildcard-bind"
+	RuleTLSDisabled       = "tls-disabled"
+	RuleWeakAlgorithm     = "weak-algorithm"
+	RuleFilePermissions   = "file-permissions"
+)
+
 func DefaultRules() []Rule {
 	return []Rule{
 		DebugLoggingRule{},
@@ -23,109 +32,102 @@ func DefaultRules() []Rule {
 
 type DebugLoggingRule struct{}
 
-func (DebugLoggingRule) ID() string { return "debug-logging" }
+func (DebugLoggingRule) ID() string { return RuleDebugLogging }
 
 func (rule DebugLoggingRule) Check(value any) []Problem {
-	var problems []Problem
-	Walk(value, func(node Node) {
+	return collectProblems(value, func(node Node) (Problem, bool) {
 		key := normalizeName(node.Key)
 		switch typed := node.Value.(type) {
 		case string:
 			if strings.EqualFold(strings.TrimSpace(typed), "debug") && (key == "level" || containsPathPart(node.Path, "log", "logging", "logger")) {
-				problems = append(problems, Problem{
-					Severity:       SeverityLow,
-					Rule:           rule.ID(),
-					Path:           FormatPath(node.Path),
-					Message:        "логирование в debug-режиме",
-					Recommendation: "Поменяйте уровень логирования на info или выше для production-окружений",
-				})
+				return newRuleProblem(
+					rule,
+					SeverityLow,
+					node.Path,
+					"логирование в debug-режиме",
+					"Поменяйте уровень логирования на info или выше для production-окружений",
+				), true
 			}
 		case bool:
 			if typed && (key == "debug" || key == "debugmode") {
-				problems = append(problems, Problem{
-					Severity:       SeverityLow,
-					Rule:           rule.ID(),
-					Path:           FormatPath(node.Path),
-					Message:        "включен debug-режим",
-					Recommendation: "Отключите debug-режим в production-конфигурации",
-				})
+				return newRuleProblem(
+					rule,
+					SeverityLow,
+					node.Path,
+					"включен debug-режим",
+					"Отключите debug-режим в production-конфигурации",
+				), true
 			}
 		}
+		return Problem{}, false
 	})
-	return problems
 }
 
 type PlaintextPasswordRule struct{}
 
-func (PlaintextPasswordRule) ID() string { return "plaintext-password" }
+func (PlaintextPasswordRule) ID() string { return RulePlaintextPassword }
 
 func (rule PlaintextPasswordRule) Check(value any) []Problem {
-	var problems []Problem
-	Walk(value, func(node Node) {
+	return collectProblems(value, func(node Node) (Problem, bool) {
 		key := normalizeName(node.Key)
 		if !isPasswordKey(key) || isPasswordReferenceKey(key) {
-			return
+			return Problem{}, false
 		}
 
 		password, ok := node.Value.(string)
 		if !ok || strings.TrimSpace(password) == "" || looksLikeSecretReference(password) {
-			return
+			return Problem{}, false
 		}
 
-		problems = append(problems, Problem{
-			Severity:       SeverityHigh,
-			Rule:           rule.ID(),
-			Path:           FormatPath(node.Path),
-			Message:        "пароль задан в конфигурации открытым текстом",
-			Recommendation: "Передавайте пароль через переменные окружения, secret manager или внешний файл с ограниченными правами",
-		})
+		return newRuleProblem(
+			rule,
+			SeverityHigh,
+			node.Path,
+			"пароль задан в конфигурации открытым текстом",
+			"Передавайте пароль через переменные окружения, secret manager или внешний файл с ограниченными правами",
+		), true
 	})
-	return problems
 }
 
 type WildcardBindRule struct{}
 
-func (WildcardBindRule) ID() string { return "wildcard-bind" }
+func (WildcardBindRule) ID() string { return RuleWildcardBind }
 
 func (rule WildcardBindRule) Check(value any) []Problem {
 	if hasAccessRestriction(value) {
 		return nil
 	}
 
-	var problems []Problem
-	Walk(value, func(node Node) {
+	return collectProblems(value, func(node Node) (Problem, bool) {
 		address, ok := node.Value.(string)
 		if !ok {
-			return
+			return Problem{}, false
 		}
 
 		if !isWildcardBindAddress(address) {
-			return
+			return Problem{}, false
 		}
 
-		key := normalizeName(node.Key)
-		if key != "host" && key != "bind" && key != "bindaddress" && key != "listen" && key != "address" {
-			return
+		if !isBindAddressKey(node.Key) {
+			return Problem{}, false
 		}
 
-		problems = append(problems, Problem{
-			Severity:       SeverityMedium,
-			Rule:           rule.ID(),
-			Path:           FormatPath(node.Path),
-			Message:        "сервис слушает 0.0.0.0 без явных ограничений доступа",
-			Recommendation: "Ограничьте адрес прослушивания, добавьте allowlist/firewall или явно настройте trusted networks",
-		})
+		return newRuleProblem(
+			rule,
+			SeverityMedium,
+			node.Path,
+			"сервис слушает 0.0.0.0 без явных ограничений доступа",
+			"Ограничьте адрес прослушивания, добавьте allowlist/firewall или явно настройте trusted networks",
+		), true
 	})
-	return problems
 }
 
 type TLSDisabledRule struct{}
 
-func (TLSDisabledRule) ID() string { return "tls-disabled" }
+func (TLSDisabledRule) ID() string { return RuleTLSDisabled }
 
 func (rule TLSDisabledRule) Check(value any) []Problem {
-	var problems []Problem
-	Walk(value, func(node Node) {
+	return collectProblems(value, func(node Node) (Problem, bool) {
 		key := normalizeName(node.Key)
 
 		disabled := false
@@ -137,44 +139,63 @@ func (rule TLSDisabledRule) Check(value any) []Problem {
 		}
 
 		if disabled {
-			problems = append(problems, Problem{
-				Severity:       SeverityHigh,
-				Rule:           rule.ID(),
-				Path:           FormatPath(node.Path),
-				Message:        "отключена TLS-проверка или HTTPS/TLS",
-				Recommendation: "Включите TLS и проверку сертификатов; не используйте insecure_skip_verify в production",
-			})
+			return newRuleProblem(
+				rule,
+				SeverityHigh,
+				node.Path,
+				"отключена TLS-проверка или HTTPS/TLS",
+				"Включите TLS и проверку сертификатов; не используйте insecure_skip_verify в production",
+			), true
+		}
+		return Problem{}, false
+	})
+}
+
+type WeakAlgorithmRule struct{}
+
+func (WeakAlgorithmRule) ID() string { return RuleWeakAlgorithm }
+
+func (rule WeakAlgorithmRule) Check(value any) []Problem {
+	return collectProblems(value, func(node Node) (Problem, bool) {
+		algorithm, ok := node.Value.(string)
+		if !ok || !isAlgorithmContext(node.Path, node.Key) {
+			return Problem{}, false
+		}
+
+		display, weak := weakAlgorithmName(algorithm)
+		if !weak {
+			return Problem{}, false
+		}
+
+		return newRuleProblem(
+			rule,
+			SeverityHigh,
+			node.Path,
+			fmt.Sprintf("используется устаревший или небезопасный алгоритм %s", display),
+			"Замените алгоритм на современный вариант, например SHA-256/Argon2/bcrypt или актуальный TLS cipher suite по назначению",
+		), true
+	})
+}
+
+func collectProblems(value any, evaluate func(Node) (Problem, bool)) []Problem {
+	var problems []Problem
+	Walk(value, func(node Node) {
+		problem, ok := evaluate(node)
+		if ok {
+			problems = append(problems, problem)
 		}
 	})
 	return problems
 }
 
-type WeakAlgorithmRule struct{}
-
-func (WeakAlgorithmRule) ID() string { return "weak-algorithm" }
-
-func (rule WeakAlgorithmRule) Check(value any) []Problem {
-	var problems []Problem
-	Walk(value, func(node Node) {
-		algorithm, ok := node.Value.(string)
-		if !ok || !isAlgorithmContext(node.Path, node.Key) {
-			return
-		}
-
-		display, weak := weakAlgorithmName(algorithm)
-		if !weak {
-			return
-		}
-
-		problems = append(problems, Problem{
-			Severity:       SeverityHigh,
-			Rule:           rule.ID(),
-			Path:           FormatPath(node.Path),
-			Message:        fmt.Sprintf("используется устаревший или небезопасный алгоритм %s", display),
-			Recommendation: "Замените алгоритм на современный вариант, например SHA-256/Argon2/bcrypt или актуальный TLS cipher suite по назначению",
-		})
-	})
-	return problems
+func newRuleProblem(rule Rule, severity Severity, path []string, message, recommendation string) Problem {
+	return Problem{
+		Severity:       severity,
+		Rule:           rule.ID(),
+		Path:           FormatPath(path),
+		Message:        message,
+		Recommendation: recommendation,
+	}
 }
 
 func normalizeName(value string) string {
@@ -245,6 +266,15 @@ func hasAccessRestriction(value any) bool {
 		}
 	})
 	return found
+}
+
+func isBindAddressKey(key string) bool {
+	switch normalizeName(key) {
+	case "host", "bind", "bindaddress", "listen", "address":
+		return true
+	default:
+		return false
+	}
 }
 
 func isWildcardBindAddress(value string) bool {

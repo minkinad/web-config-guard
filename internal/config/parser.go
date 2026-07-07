@@ -65,8 +65,18 @@ func parseJSON(data []byte) (any, error) {
 }
 
 func parseYAML(data []byte) (any, error) {
+	decoder := yaml.NewDecoder(bytes.NewReader(data))
+
 	var value any
-	if err := yaml.Unmarshal(data, &value); err != nil {
+	if err := decoder.Decode(&value); err != nil {
+		return nil, err
+	}
+
+	var extra any
+	if err := decoder.Decode(&extra); err != io.EOF {
+		if err == nil {
+			return nil, errors.New("multiple YAML documents are not supported")
+		}
 		return nil, err
 	}
 	return normalize(value), nil

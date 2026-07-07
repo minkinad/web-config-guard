@@ -41,3 +41,10 @@ func TestParseJSONRejectsTrailingDocument(t *testing.T) {
 		t.Fatal("Parse() error = nil, want error")
 	}
 }
+
+func TestParseYAMLRejectsMultipleDocuments(t *testing.T) {
+	data := []byte("log:\n  level: info\n---\ndebug: true\n")
+	if _, err := Parse(data, "config.yaml"); err == nil {
+		t.Fatal("Parse() error = nil, want error")
+	}
+}

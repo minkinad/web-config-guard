@@ -1,0 +1,18 @@
+name: PR metadata
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+permissions:
+  contents: read
+jobs:
+  metadata:
+    runs-on: ubuntu-latest
+    env:
+      PR_TITLE: ${{ github.event.pull_request.title }}
+      PR_BODY: ${{ github.event.pull_request.body }}
+    steps:
+      - name: Validate title and description
+        shell: bash
+        run: |
+          [[ "$PR_TITLE" =~ ^(feat|fix|docs|test|refactor|chore|ci|build|perf|revert)(\([a-z0-9_-]+\))?!?:[[:space:]].+ ]] || { echo 'Use a Conventional Commit title'; exit 1; }
+          [[ ${#PR_BODY} -ge 20 ]] || { echo 'Describe the change in at least 20 characters'; exit 1; }

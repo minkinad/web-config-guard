@@ -34,9 +34,12 @@ func (runner Runner) CheckBytes(data []byte, sourceName string) (Result, error) 
 }
 
 func (runner Runner) CheckReader(reader io.Reader, sourceName string) (Result, error) {
-	data, err := io.ReadAll(reader)
+	data, err := io.ReadAll(io.LimitReader(reader, 10<<20+1))
 	if err != nil {
 		return Result{}, err
+	}
+	if len(data) > 10<<20 {
+		return Result{}, fmt.Errorf("input exceeds 10 MiB")
 	}
 	return runner.CheckBytes(data, sourceName)
 }
@@ -90,6 +93,9 @@ func (runner Runner) CheckDirectory(ctx context.Context, root string) (Result, e
 }
 
 func (runner Runner) checkFile(path string, info fs.FileInfo) (Result, error) {
+	if info.Size() > 10<<20 {
+		return Result{}, fmt.Errorf("%s exceeds 10 MiB", path)
+	}
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return Result{}, err

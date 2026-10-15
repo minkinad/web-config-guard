@@ -10,6 +10,11 @@ type Checker struct {
 	Rules []Rule
 }
 
+// TODO(web-config-guard): Add stable finding fingerprints before baseline/diff.
+// Suggested approach: hash rule ID, normalized file path, and setting path;
+// exclude message text and sensitive values. Acceptance: fingerprints remain
+// stable across ordering changes and never expose config contents.
+
 func NewChecker(rules []Rule) Checker {
 	if len(rules) == 0 {
 		rules = DefaultRules()

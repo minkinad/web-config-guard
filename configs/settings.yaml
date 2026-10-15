@@ -1,0 +1,6 @@
+server:
+  listen: ":8080"
+log:
+  format: text
+  level: info
+fail_on: low

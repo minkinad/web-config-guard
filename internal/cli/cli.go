@@ -34,7 +34,7 @@ func Run(ctx context.Context, args []string, stdin io.Reader, stdout, stderr io.
 		if err != nil {
 			return 1
 		}
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 		if resp.StatusCode != http.StatusOK {
 			return 1
 		}
@@ -61,7 +61,7 @@ func Run(ctx context.Context, args []string, stdin io.Reader, stdout, stderr io.
 	}
 	settings, err := config.LoadSettings(configPath)
 	if err != nil {
-		fmt.Fprintf(stderr, "error: %v\n", err)
+		_, _ = fmt.Fprintf(stderr, "error: %v\n", err)
 		return exitBadUsage
 	}
 
@@ -78,11 +78,11 @@ func Run(ctx context.Context, args []string, stdin io.Reader, stdout, stderr io.
 	flags.StringVar(&logFormat, "log-format", settings.Log.Format, "server log format: json or text")
 	flags.StringVar(&logLevel, "log-level", settings.Log.Level, "server log level")
 	flags.Usage = func() {
-		fmt.Fprintln(stderr, "Usage:")
-		fmt.Fprintln(stderr, "  web-config-guard [flags] <config-file-or-directory>")
-		fmt.Fprintln(stderr, "  web-config-guard --stdin [flags]")
-		fmt.Fprintln(stderr, "  web-config-guard --serve [--addr :8080]")
-		fmt.Fprintln(stderr)
+		_, _ = fmt.Fprintln(stderr, "Usage:")
+		_, _ = fmt.Fprintln(stderr, "  web-config-guard [flags] <config-file-or-directory>")
+		_, _ = fmt.Fprintln(stderr, "  web-config-guard --stdin [flags]")
+		_, _ = fmt.Fprintln(stderr, "  web-config-guard --serve [--addr :8080]")
+		_, _ = fmt.Fprintln(stderr)
 		flags.PrintDefaults()
 	}
 
@@ -94,14 +94,14 @@ func Run(ctx context.Context, args []string, stdin io.Reader, stdout, stderr io.
 	settings.Log.Format = logFormat
 	settings.Log.Level = logLevel
 	if err := settings.Validate(); err != nil {
-		fmt.Fprintf(stderr, "error: %v\n", err)
+		_, _ = fmt.Fprintf(stderr, "error: %v\n", err)
 		return exitBadUsage
 	}
 
 	run := runner.New()
 	if serve {
 		if flags.NArg() != 0 || useStdin {
-			fmt.Fprintln(stderr, "--serve cannot be combined with a file path or --stdin")
+			_, _ = fmt.Fprintln(stderr, "--serve cannot be combined with a file path or --stdin")
 			return exitBadUsage
 		}
 		return serveHTTP(ctx, addr, run, settings, stderr)
@@ -113,7 +113,7 @@ func Run(ctx context.Context, args []string, stdin io.Reader, stdout, stderr io.
 	switch {
 	case useStdin:
 		if flags.NArg() != 0 {
-			fmt.Fprintln(stderr, "--stdin cannot be combined with a positional path")
+			_, _ = fmt.Fprintln(stderr, "--stdin cannot be combined with a positional path")
 			return exitBadUsage
 		}
 		result, err = run.CheckReader(stdin, "stdin.yaml")
@@ -124,12 +124,12 @@ func Run(ctx context.Context, args []string, stdin io.Reader, stdout, stderr io.
 		return exitBadUsage
 	}
 	if err != nil {
-		fmt.Fprintf(stderr, "error: %v\n", err)
+		_, _ = fmt.Fprintf(stderr, "error: %v\n", err)
 		return exitBadUsage
 	}
 
 	if err := writeOutput(stdout, output, result); err != nil {
-		fmt.Fprintf(stderr, "error: %v\n", err)
+		_, _ = fmt.Fprintf(stderr, "error: %v\n", err)
 		return exitBadUsage
 	}
 
@@ -176,7 +176,7 @@ func serveHTTP(ctx context.Context, addr string, run runner.Runner, settings con
 		_ = srv.Shutdown(end)
 	}()
 	if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-		fmt.Fprintf(stderr, "error: %v\n", err)
+		_, _ = fmt.Fprintf(stderr, "error: %v\n", err)
 		return exitBadUsage
 	}
 	return exitOK

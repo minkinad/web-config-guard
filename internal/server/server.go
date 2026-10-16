@@ -51,7 +51,7 @@ func (server *Server) health(w http.ResponseWriter, _ *http.Request) {
 }
 
 func (server *Server) check(w http.ResponseWriter, request *http.Request) {
-	defer request.Body.Close()
+	defer func() { _ = request.Body.Close() }()
 
 	data, err := io.ReadAll(http.MaxBytesReader(w, request.Body, 10<<20))
 	if err != nil {

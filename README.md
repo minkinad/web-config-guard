@@ -1,4 +1,4 @@
-# web-config-guard
+# web-config-guard [![CI](https://github.com/minkinad/web-config-guard/actions/workflows/ci.yml/badge.svg)](https://github.com/minkinad/web-config-guard/actions/workflows/ci.yml) [![CodeQL](https://github.com/minkinad/web-config-guard/actions/workflows/codeql.yml/badge.svg)](https://github.com/minkinad/web-config-guard/actions/workflows/codeql.yml) [![Security](https://github.com/minkinad/web-config-guard/actions/workflows/security.yml/badge.svg)](https://github.com/minkinad/web-config-guard/actions/workflows/security.yml)
 
 `web-config-guard` проверяет YAML/JSON настройки веб-приложений на типичные опасные решения. Существующие сценарии проверки файла, директории, stdin и HTTP payload сохранены.
 
@@ -24,7 +24,7 @@ cat config.yaml | ./bin/web-config-guard --stdin --fail-on high
 curl -X POST --data-binary @config.yaml 'http://127.0.0.1:8080/v1/check?filename=config.yaml'
 ```
 
-Коды выхода: 0 — нет находок выше выбранного порога или `--silent`; 1 — есть находки; 2 — ошибка аргументов, чтения или разбора. HTTP API всегда возвращает JSON с массивом `problems`, включая пустой массив.
+Коды выхода: 0 — нет находок выше выбранного порога или `--silent`; 1 — есть находки; 2 — ошибка аргументов, чтения или разбора. HTTP API возвращает JSON с полем `problems`; при отсутствии находок текущий формат может содержать `null`.
 
 ## Конфигурация
 

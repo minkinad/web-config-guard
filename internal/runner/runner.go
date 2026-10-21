@@ -137,6 +137,6 @@ func FormatText(problems []guard.Problem) string {
 		builder.WriteString(problem.Text())
 		builder.WriteByte('\n')
 	}
-	builder.WriteString(fmt.Sprintf("Found %d problem(s).\n", len(problems)))
+	fmt.Fprintf(&builder, "Found %d problem(s).\n", len(problems))
 	return builder.String()
 }

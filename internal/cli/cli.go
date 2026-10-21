@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -167,19 +168,55 @@ func serveHTTP(ctx context.Context, addr string, run runner.Runner, settings con
 	}
 	logger := slog.New(h)
 	handler := server.New(run, logger).Handler()
-	srv := &http.Server{Addr: addr, Handler: handler, ReadHeaderTimeout: 5 * time.Second, IdleTimeout: 60 * time.Second}
+	srv := newHTTPServer(addr, handler)
+	listener, err := net.Listen("tcp", addr)
+	if err != nil {
+		_, _ = fmt.Fprintf(stderr, "error: %v\n", err)
+		return exitBadUsage
+	}
 	logger.Info("listening", "address", addr)
-	go func() {
-		<-ctx.Done()
-		end, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer cancel()
-		_ = srv.Shutdown(end)
-	}()
-	if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+	if err := serveWithShutdown(ctx, srv, server.LimitConnections(listener, server.MaxConnections)); err != nil {
 		_, _ = fmt.Fprintf(stderr, "error: %v\n", err)
 		return exitBadUsage
 	}
 	return exitOK
+}
+
+func newHTTPServer(addr string, handler http.Handler) *http.Server {
+	return &http.Server{
+		Addr: addr, Handler: handler,
+		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       15 * time.Second,
+		WriteTimeout:      30 * time.Second,
+		IdleTimeout:       60 * time.Second,
+		MaxHeaderBytes:    16 << 10,
+	}
+}
+
+func serveWithShutdown(ctx context.Context, srv *http.Server, listener net.Listener) error {
+	serveDone := make(chan struct{})
+	shutdownDone := make(chan error, 1)
+	go func() {
+		select {
+		case <-ctx.Done():
+			end, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			err := srv.Shutdown(end)
+			if err != nil {
+				_ = srv.Close()
+			}
+			shutdownDone <- err
+		case <-serveDone:
+			shutdownDone <- nil
+		}
+	}()
+	err := srv.Serve(listener)
+	close(serveDone)
+	shutdownErr := <-shutdownDone
+	if errors.Is(err, http.ErrServerClosed) {
+		return shutdownErr
+	}
+	return err
 }
 
 func Main() {

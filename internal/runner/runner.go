@@ -26,19 +26,27 @@ func New() Runner {
 }
 
 func (runner Runner) CheckBytes(data []byte, sourceName string) (Result, error) {
-	value, err := config.Parse(data, sourceName)
+	return runner.CheckBytesContext(context.Background(), data, sourceName)
+}
+
+func (runner Runner) CheckBytesContext(ctx context.Context, data []byte, sourceName string) (Result, error) {
+	value, err := config.ParseContext(ctx, data, sourceName)
 	if err != nil {
 		return Result{}, err
 	}
-	return Result{Problems: runner.Checker.Check(value)}, nil
+	problems, err := runner.Checker.CheckContext(ctx, value)
+	if err != nil {
+		return Result{}, err
+	}
+	return Result{Problems: problems}, nil
 }
 
 func (runner Runner) CheckReader(reader io.Reader, sourceName string) (Result, error) {
-	data, err := io.ReadAll(io.LimitReader(reader, 10<<20+1))
+	data, err := io.ReadAll(io.LimitReader(reader, config.MaxDocumentBytes+1))
 	if err != nil {
 		return Result{}, err
 	}
-	if len(data) > 10<<20 {
+	if len(data) > config.MaxDocumentBytes {
 		return Result{}, fmt.Errorf("input exceeds 10 MiB")
 	}
 	return runner.CheckBytes(data, sourceName)
@@ -93,7 +101,7 @@ func (runner Runner) CheckDirectory(ctx context.Context, root string) (Result, e
 }
 
 func (runner Runner) checkFile(path string, info fs.FileInfo) (Result, error) {
-	if info.Size() > 10<<20 {
+	if info.Size() > config.MaxDocumentBytes {
 		return Result{}, fmt.Errorf("%s exceeds 10 MiB", path)
 	}
 	data, err := os.ReadFile(path)

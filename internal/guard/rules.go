@@ -1,6 +1,7 @@
 package guard
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"strings"
@@ -35,7 +36,12 @@ type DebugLoggingRule struct{}
 func (DebugLoggingRule) ID() string { return RuleDebugLogging }
 
 func (rule DebugLoggingRule) Check(value any) []Problem {
-	return collectProblems(value, func(node Node) (Problem, bool) {
+	problems, _ := rule.CheckContext(context.Background(), value)
+	return problems
+}
+
+func (rule DebugLoggingRule) CheckContext(ctx context.Context, value any) ([]Problem, error) {
+	return collectProblems(ctx, value, func(node Node) (Problem, bool) {
 		key := normalizeName(node.Key)
 		switch typed := node.Value.(type) {
 		case string:
@@ -68,7 +74,12 @@ type PlaintextPasswordRule struct{}
 func (PlaintextPasswordRule) ID() string { return RulePlaintextPassword }
 
 func (rule PlaintextPasswordRule) Check(value any) []Problem {
-	return collectProblems(value, func(node Node) (Problem, bool) {
+	problems, _ := rule.CheckContext(context.Background(), value)
+	return problems
+}
+
+func (rule PlaintextPasswordRule) CheckContext(ctx context.Context, value any) ([]Problem, error) {
+	return collectProblems(ctx, value, func(node Node) (Problem, bool) {
 		key := normalizeName(node.Key)
 		if !isPasswordKey(key) || isPasswordReferenceKey(key) {
 			return Problem{}, false
@@ -94,11 +105,17 @@ type WildcardBindRule struct{}
 func (WildcardBindRule) ID() string { return RuleWildcardBind }
 
 func (rule WildcardBindRule) Check(value any) []Problem {
-	if hasAccessRestriction(value) {
-		return nil
+	problems, _ := rule.CheckContext(context.Background(), value)
+	return problems
+}
+
+func (rule WildcardBindRule) CheckContext(ctx context.Context, value any) ([]Problem, error) {
+	restricted, err := hasAccessRestriction(ctx, value)
+	if err != nil || restricted {
+		return nil, err
 	}
 
-	return collectProblems(value, func(node Node) (Problem, bool) {
+	return collectProblems(ctx, value, func(node Node) (Problem, bool) {
 		address, ok := node.Value.(string)
 		if !ok {
 			return Problem{}, false
@@ -127,7 +144,12 @@ type TLSDisabledRule struct{}
 func (TLSDisabledRule) ID() string { return RuleTLSDisabled }
 
 func (rule TLSDisabledRule) Check(value any) []Problem {
-	return collectProblems(value, func(node Node) (Problem, bool) {
+	problems, _ := rule.CheckContext(context.Background(), value)
+	return problems
+}
+
+func (rule TLSDisabledRule) CheckContext(ctx context.Context, value any) ([]Problem, error) {
+	return collectProblems(ctx, value, func(node Node) (Problem, bool) {
 		key := normalizeName(node.Key)
 
 		disabled := false
@@ -156,7 +178,12 @@ type WeakAlgorithmRule struct{}
 func (WeakAlgorithmRule) ID() string { return RuleWeakAlgorithm }
 
 func (rule WeakAlgorithmRule) Check(value any) []Problem {
-	return collectProblems(value, func(node Node) (Problem, bool) {
+	problems, _ := rule.CheckContext(context.Background(), value)
+	return problems
+}
+
+func (rule WeakAlgorithmRule) CheckContext(ctx context.Context, value any) ([]Problem, error) {
+	return collectProblems(ctx, value, func(node Node) (Problem, bool) {
 		algorithm, ok := node.Value.(string)
 		if !ok || !isAlgorithmContext(node.Path, node.Key) {
 			return Problem{}, false
@@ -177,15 +204,18 @@ func (rule WeakAlgorithmRule) Check(value any) []Problem {
 	})
 }
 
-func collectProblems(value any, evaluate func(Node) (Problem, bool)) []Problem {
+func collectProblems(ctx context.Context, value any, evaluate func(Node) (Problem, bool)) ([]Problem, error) {
 	var problems []Problem
-	Walk(value, func(node Node) {
+	err := WalkContext(ctx, value, func(node Node) {
 		problem, ok := evaluate(node)
 		if ok {
 			problems = append(problems, problem)
 		}
 	})
-	return problems
+	if err != nil {
+		return nil, err
+	}
+	return problems, nil
 }
 
 func newRuleProblem(rule Rule, severity Severity, path []string, message, recommendation string) Problem {
@@ -247,9 +277,9 @@ func looksLikeSecretReference(value string) bool {
 		normalized == "<redacted>"
 }
 
-func hasAccessRestriction(value any) bool {
+func hasAccessRestriction(ctx context.Context, value any) (bool, error) {
 	found := false
-	Walk(value, func(node Node) {
+	err := WalkContext(ctx, value, func(node Node) {
 		if found {
 			return
 		}
@@ -265,7 +295,7 @@ func hasAccessRestriction(value any) bool {
 			}
 		}
 	})
-	return found
+	return found, err
 }
 
 func isBindAddressKey(key string) bool {

@@ -1,6 +1,7 @@
 package guard
 
 import (
+	"context"
 	"fmt"
 	"sort"
 	"strings"
@@ -13,10 +14,17 @@ type Node struct {
 }
 
 func Walk(value any, visit func(Node)) {
-	walk(value, nil, "", visit)
+	_ = WalkContext(context.Background(), value, visit)
 }
 
-func walk(value any, path []string, key string, visit func(Node)) {
+func WalkContext(ctx context.Context, value any, visit func(Node)) error {
+	return walk(ctx, value, nil, "", visit)
+}
+
+func walk(ctx context.Context, value any, path []string, key string, visit func(Node)) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	visit(Node{Path: append([]string(nil), path...), Key: key, Value: value})
 
 	switch typed := value.(type) {
@@ -27,14 +35,19 @@ func walk(value any, path []string, key string, visit func(Node)) {
 		}
 		sort.Strings(keys)
 		for _, childKey := range keys {
-			walk(typed[childKey], append(path, childKey), childKey, visit)
+			if err := walk(ctx, typed[childKey], append(path, childKey), childKey, visit); err != nil {
+				return err
+			}
 		}
 	case []any:
 		for i, child := range typed {
 			part := fmt.Sprintf("[%d]", i)
-			walk(child, append(path, part), part, visit)
+			if err := walk(ctx, child, append(path, part), part, visit); err != nil {
+				return err
+			}
 		}
 	}
+	return ctx.Err()
 }
 
 func FormatPath(parts []string) string {

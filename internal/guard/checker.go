@@ -1,6 +1,7 @@
 package guard
 
 import (
+	"context"
 	"io/fs"
 	"os"
 	"sort"
@@ -23,12 +24,33 @@ func NewChecker(rules []Rule) Checker {
 }
 
 func (checker Checker) Check(value any) []Problem {
+	problems, _ := checker.CheckContext(context.Background(), value)
+	return problems
+}
+
+func (checker Checker) CheckContext(ctx context.Context, value any) ([]Problem, error) {
 	var problems []Problem
 	for _, rule := range checker.Rules {
-		problems = append(problems, rule.Check(value)...)
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+		if contextual, ok := rule.(interface {
+			CheckContext(context.Context, any) ([]Problem, error)
+		}); ok {
+			found, err := contextual.CheckContext(ctx, value)
+			if err != nil {
+				return nil, err
+			}
+			problems = append(problems, found...)
+		} else {
+			problems = append(problems, rule.Check(value)...)
+		}
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
 	}
 	sortProblems(problems)
-	return problems
+	return problems, nil
 }
 
 func CheckFilePermissions(path string, info fs.FileInfo, hasSecrets bool) []Problem {
